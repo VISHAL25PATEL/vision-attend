@@ -7,3 +7,4 @@ venv/
 AppData/ 
 .VirtualBox/ 
 .anaconda/ 
+.vercel
