@@ -9,7 +9,7 @@ from deepface import DeepFace
 from scipy.spatial.distance import cosine
 import zipfile
 from flask import send_from_directory
-
+import base64
 # Flask app initialization
 app = Flask(__name__)
 
@@ -86,9 +86,6 @@ def process_frame():
         np_arr = np.frombuffer(image_bytes, np.uint8)
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-        # Debugging: Save the received frame
-        cv2.imwrite("debug_received_frame.jpg", frame)
-
         # Convert to grayscale for face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
@@ -100,9 +97,18 @@ def process_frame():
         recognized_person = "Unknown"
         for (x, y, w, h) in faces:
             face_roi = frame[y:y + h, x:x + w]
-            cv2.imwrite("debug_face_roi.jpg", face_roi)  # Save face image for debugging
+            
+            # Ensure the detected face is clear before proceeding
+            if face_roi.shape[0] < 60 or face_roi.shape[1] < 60:
+                print("Face too small to recognize!")
+                continue
 
-            embedding = DeepFace.represent(face_roi, model_name=RECOGNITION_MODEL, enforce_detection=False)
+            # Get face embedding
+            try:
+                embedding = DeepFace.represent(face_roi, model_name=RECOGNITION_MODEL, enforce_detection=False)
+            except Exception as e:
+                print("DeepFace error:", str(e))
+                continue
 
             if embedding:
                 face_embedding = np.array(embedding[0]["embedding"])
@@ -115,10 +121,11 @@ def process_frame():
                         best_score = distance
                         best_match = id_name
 
-                recognized_person = best_match if best_match else "Unknown"
-
-                if recognized_person in known_faces:
+                if best_match:
+                    recognized_person = best_match
                     attendance[recognized_person] = "Present"
+                else:
+                    recognized_person = "Unknown"
 
         print(f"Recognized: {recognized_person}")  # Debug log
         return jsonify({'message': 'Frame received', 'name': recognized_person})
@@ -126,6 +133,7 @@ def process_frame():
     except Exception as e:
         print("Error processing frame:", str(e))
         return jsonify({'error': str(e)})
+
 
 
 
@@ -248,11 +256,17 @@ def load_known_faces():
                 embedding = DeepFace.represent(img_path, model_name=RECOGNITION_MODEL, enforce_detection=True)
                 if embedding:
                     face_embedding = np.array(embedding[0]["embedding"])
-                    name = os.path.splitext(filename)[0]
-                    known_faces[name] = face_embedding
-            except:
-                pass
+                    
+                    # Extract student ID and name correctly
+                    name, _ = os.path.splitext(filename)
+                    parts = name.split("_", 1)
+                    student_id = parts[0]
+                    student_name = parts[1].replace("_", " ") if len(parts) > 1 else "Unknown"
 
+                    # Store embeddings with full student name
+                    known_faces[student_id] = face_embedding
+            except Exception as e:
+                print(f"Error processing {filename}: {str(e)}")
 
 # Run Flask App
 if __name__ == "__main__":
