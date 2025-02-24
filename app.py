@@ -86,15 +86,24 @@ def process_frame():
         np_arr = np.frombuffer(image_bytes, np.uint8)
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
+        # Debugging: Save the received frame
+        cv2.imwrite("debug_received_frame.jpg", frame)
+
         # Convert to grayscale for face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
 
+        if len(faces) == 0:
+            print("No face detected!")
+            return jsonify({'message': 'Frame received', 'name': "No Face Detected"})
+
         recognized_person = "Unknown"
         for (x, y, w, h) in faces:
             face_roi = frame[y:y + h, x:x + w]
-            embedding = DeepFace.represent(face_roi, model_name=RECOGNITION_MODEL, enforce_detection=True)
-            
+            cv2.imwrite("debug_face_roi.jpg", face_roi)  # Save face image for debugging
+
+            embedding = DeepFace.represent(face_roi, model_name=RECOGNITION_MODEL, enforce_detection=False)
+
             if embedding:
                 face_embedding = np.array(embedding[0]["embedding"])
                 best_match = None
@@ -111,10 +120,13 @@ def process_frame():
                 if recognized_person in known_faces:
                     attendance[recognized_person] = "Present"
 
+        print(f"Recognized: {recognized_person}")  # Debug log
         return jsonify({'message': 'Frame received', 'name': recognized_person})
 
     except Exception as e:
+        print("Error processing frame:", str(e))
         return jsonify({'error': str(e)})
+
 
 
 
