@@ -75,83 +75,46 @@ def attendance_page():
 
 
 # ---------- 4️⃣ Route: Video Streaming ----------
-def generate_frames():
-    global recognized_person, stop_attendance_flag
-    def find_available_camera():
-        for index in range(5):  # Check first 5 indexes
-            cap = cv2.VideoCapture(index)
-            if cap.isOpened():
-                cap.release()
-                return index
-        return -1  # No camera found
+# ---------- 4️⃣ Route: Video Streaming (Accepting Images from Frontend) ----------
+@app.route('/process_frame', methods=['POST'])
+def process_frame():
+    global recognized_person, attendance
+    try:
+        data = request.json['image']
+        encoded_data = data.split(',')[1]  # Remove metadata from Base64
+        image_bytes = base64.b64decode(encoded_data)
+        np_arr = np.frombuffer(image_bytes, np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-    camera_index = find_available_camera()
-    cap = cv2.VideoCapture(camera_index if camera_index != -1 else 0)
-
-
-
-    if not cap.isOpened():
-        return
-
-    frame_count = 0
-    processing = False
-
-    def recognize_face(face_roi):
-        """Handles face recognition."""
-        global recognized_person, attendance
-        nonlocal processing
-        processing = True
-        try:
-            embedding = DeepFace.represent(face_roi, model_name=RECOGNITION_MODEL, enforce_detection=True)
-            if not embedding:
-                return
-
-            face_embedding = np.array(embedding[0]["embedding"])
-            best_match = None
-            best_score = float("inf")
-
-            for id_name, stored_embedding in known_faces.items():
-                distance = cosine(face_embedding, stored_embedding)
-                if distance < best_score and distance < THRESHOLD:
-                    best_score = distance
-                    best_match = id_name
-
-            recognized_person = best_match if best_match else "Unknown"
-
-            if recognized_person in known_faces:
-                attendance[recognized_person] = "Present"
-
-        except:
-            recognized_person = "Unknown"
-        processing = False
-
-    while not stop_attendance_flag:
-        success, frame = cap.read()
-        if not success:
-            break
-
-        frame_count += 1
-        if frame_count % FRAME_SKIP != 0:
-            continue
-
+        # Convert to grayscale for face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
 
+        recognized_person = "Unknown"
         for (x, y, w, h) in faces:
             face_roi = frame[y:y + h, x:x + w]
-            if not processing:
-                threading.Thread(target=recognize_face, args=(face_roi,)).start()
+            embedding = DeepFace.represent(face_roi, model_name=RECOGNITION_MODEL, enforce_detection=True)
+            
+            if embedding:
+                face_embedding = np.array(embedding[0]["embedding"])
+                best_match = None
+                best_score = float("inf")
 
-            # Draw rectangle around face
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                for id_name, stored_embedding in known_faces.items():
+                    distance = cosine(face_embedding, stored_embedding)
+                    if distance < best_score and distance < THRESHOLD:
+                        best_score = distance
+                        best_match = id_name
 
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
+                recognized_person = best_match if best_match else "Unknown"
 
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                if recognized_person in known_faces:
+                    attendance[recognized_person] = "Present"
 
-    cap.release()
+        return jsonify({'message': 'Frame received', 'name': recognized_person})
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 
 
@@ -193,10 +156,7 @@ def stop_attendance():
 
 @app.route("/video_feed")
 def video_feed():
-    if attendance_started:  # Only stream video if attendance has started
-        return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
-    else:
-        return Response("", mimetype="multipart/x-mixed-replace; boundary=frame")
+    return Response("", mimetype="multipart/x-mixed-replace; boundary=frame")
 
 # ---------- 8️⃣ Route: Final Page ----------
 @app.route("/final")
