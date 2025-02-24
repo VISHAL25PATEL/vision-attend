@@ -77,7 +77,7 @@ def attendance_page():
 # ---------- 4️⃣ Route: Video Streaming ----------
 def generate_frames():
     global recognized_person, stop_attendance_flag
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
 
     if not cap.isOpened():
         return
