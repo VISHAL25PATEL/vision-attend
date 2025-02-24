@@ -164,26 +164,54 @@
 
     <script>
         function startAttendance() {
-            fetch("/start_attendance")
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById("attendanceStatus").innerText = data.message;
-                    document.getElementById("startAttendance").style.display = "none";
-                    document.getElementById("stopAttendance").style.display = "block";
-                    document.getElementById("videoContainer").style.display = "flex";
-                    document.getElementById("videoFeed").src = "/video_feed";
-                    document.getElementById("detectedPersonBox").style.display = "block";
-                });
+            document.getElementById("startAttendance").style.display = "none";
+            document.getElementById("stopAttendance").style.display = "block";
+            document.getElementById("videoContainer").style.display = "flex";
+            document.getElementById("detectedPersonBox").style.display = "block";
+
+            // Start Camera
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                let video = document.createElement("video");
+                video.srcObject = stream;
+                video.play();
+
+            // Capture & Send Frames Every 1 Second
+            setInterval(() => {
+                let canvas = document.createElement("canvas");
+                let ctx = canvas.getContext("2d");
+                canvas.width = 640;
+                canvas.height = 480;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                let imageData = canvas.toDataURL("image/jpeg");
+
+                fetch("/process_frame", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ image: imageData })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("detectedName").innerText = data.name;
+                    });
+                }, 1000);
+            })
+            .catch(error => console.error("Error accessing camera:", error));
         }
 
+
         function stopAttendance() {
+            let stream = document.querySelector("video")?.srcObject;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop()); // Stop Camera
+            }
             fetch("/stop_attendance")
-                .then(response => response.json())
-                .then(() => {
-                    document.getElementById("videoFeed").src = "";
-                    window.location.href = "/final";
-                });
-        }
+            .then(response => response.json())
+            .then(() => {
+            window.location.href = "/final";
+            });
+}
+
 
         function updateDetectedName() {
             fetch("/get_detected_name")
