@@ -77,7 +77,20 @@ def attendance_page():
 # ---------- 4️⃣ Route: Video Streaming ----------
 def generate_frames():
     global recognized_person, stop_attendance_flag
-    cap = cv2.VideoCapture(1)
+    def find_camera():
+    for index in range(5):  
+        cap = cv2.VideoCapture(index)
+        if cap.isOpened():
+            cap.release()
+            return index
+    return -1  # No camera found
+
+    camera_index = find_camera()
+    if camera_index == -1:
+        raise RuntimeError("No camera found!")
+
+    cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)  # Use appropriate backend
+
 
     if not cap.isOpened():
         return
