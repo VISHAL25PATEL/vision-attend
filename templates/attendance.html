@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition Attendance</title>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            background: #D6E0E1;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Logo (Top Left) */
+        .logo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 350px;
+            height: auto;
+            cursor: pointer;
+        }
+
+        /* Main Container (Flexbox) */
+        .main-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px; /* Space between boxes */
+            margin-top: 20px;
+            flex-wrap: wrap; /* Responsive */
+        }
+
+        /* Attendance & Detected Person Boxes */
+        .side-box {
+            background: white;
+            padding: 35px;
+            border-radius: 12px;
+            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+            width: 300px;
+            text-align: center;
+            border: 3px solid #031019;
+            flex: 1;
+            min-width: 280px; /* Responsive */
+            align-self: center; /* Align in middle */
+        }
+
+        /* Larger Video Feed Box */
+        .video-box {
+            background: white;
+            padding: 35px;
+            border-radius: 12px;
+            box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+            width: 450px; /* Larger box */
+            text-align: center;
+            border: 3px solid #031019;
+            flex: 1.5;
+            min-width: 400px; /* Responsive */
+        }
+
+        h2 {
+            color: #031019;
+            margin-bottom: 15px;
+        }
+
+        /* Buttons */
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #031019;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #04202F;
+        }
+
+        /* Stop Attendance Button */
+        #stopAttendance {
+            display: none;
+            background: red;
+        }
+
+        /* Video Feed */
+        .video-container {
+            display: none;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .video-container img {
+            width: 100%;
+            max-width: 100%; /* Fills video-box */
+            border-radius: 10px;
+            border: 3px solid #031019;
+        }
+
+        /* Detected Person Box (Hidden Initially) */
+        #detectedPersonBox {
+            display: none;
+        }
+
+        /* Logo1 (Bottom Right) */
+        .logo1 {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: auto;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Logo (Click to go to Initial Page) -->
+    <img src="{{ url_for('static', filename='LOGO.png') }}" alt="Logo" class="logo" onclick="window.location.href='{{ url_for('upload') }}'">
+
+    <!-- Horizontal Box Layout -->
+    <div class="main-container">
+
+        <!-- Attendance Control (Left Box) -->
+        <div class="side-box">
+            <h2>Attendance Control</h2>
+            <button id="startAttendance" onclick="startAttendance()">Start Attendance</button>
+            <button id="stopAttendance" onclick="stopAttendance()">Stop Attendance</button>
+            <p id="attendanceStatus"></p>
+        </div>
+
+        <!-- Live Video Feed (Center & Bigger Box) -->
+        <div class="video-box">
+            <h2>Live Video Feed</h2>
+            <div class="video-container" id="videoContainer">
+                <img id="videoFeed" src="" alt="Video Stream">
+            </div>
+        </div>
+
+        <!-- Detected Person (Right Box) -->
+        <div class="side-box" id="detectedPersonBox">
+            <h2>Detected Person</h2>
+            <p id="detectedName">Scanning...</p>
+        </div>
+
+    </div>
+
+    <!-- Logo1 (Bottom Right) -->
+    <img src="{{ url_for('static', filename='LOGO1.png') }}" alt="Logo1" class="logo1">
+
+    <script>
+        function startAttendance() {
+            fetch("/start_attendance")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("attendanceStatus").innerText = data.message;
+                    document.getElementById("startAttendance").style.display = "none";
+                    document.getElementById("stopAttendance").style.display = "block";
+                    document.getElementById("videoContainer").style.display = "flex";
+                    document.getElementById("videoFeed").src = "/video_feed";
+                    document.getElementById("detectedPersonBox").style.display = "block";
+                });
+        }
+
+        function stopAttendance() {
+            fetch("/stop_attendance")
+                .then(response => response.json())
+                .then(() => {
+                    document.getElementById("videoFeed").src = "";
+                    window.location.href = "/final";
+                });
+        }
+
+        function updateDetectedName() {
+            fetch("/get_detected_name")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("detectedName").innerText = data.name;
+                });
+        }
+
+        setInterval(updateDetectedName, 1000);
+    </script>
+
+</body>
+</html>
